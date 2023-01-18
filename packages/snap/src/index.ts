@@ -1,5 +1,18 @@
 import { OnRpcRequestHandler } from '@metamask/snap-types';
 
+import { SnapLedgerKeyring } from './ledger/SnapLedgerKeyring';
+import { KeyringMethods } from './types/methods.enum';
+import { SnapKeyringState } from './types/SnapKeyringState';
+import { initializeSnapState } from './utils/initialize-state';
+
+/**
+ * Get a message from the origin. For demonstration purposes only.
+ *
+ * @param originString - The origin string.
+ * @returns A message based on the origin.
+ */
+export const getMessage = (originString: string): string =>
+  `Hello, ${originString}!`;
 
 /**
  * Handle incoming JSON-RPC requests, sent through `wallet_invokeSnap`.
