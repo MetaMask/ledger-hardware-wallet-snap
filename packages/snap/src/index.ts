@@ -55,6 +55,18 @@ export const onRpcRequest: OnRpcRequestHandler = async ({
         persistedState,
         request,
       );
+    case KeyringMethods.SignEIP712Message:
+      throw new Error('TODO');
+    case KeyringMethods.SignEIP712HashedMessage:
+      throw new Error('TODO');
+    case KeyringMethods.SignMessage:
+      return await snapLedgerKeyring.signMessage(snap, persistedState, request);
+    case KeyringMethods.SignTransaction:
+      return await snapLedgerKeyring.signTransaction(
+        snap,
+        persistedState,
+        request,
+      );
     case KeyringMethods.ListAccounts:
       return await snapLedgerKeyring.listAccounts(persistedState, request);
     // Only called once
