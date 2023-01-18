@@ -21,6 +21,16 @@ export const onRpcRequest: OnRpcRequestHandler = async ({
     params: ['get'],
   });
 
+  if (!persistedState) {
+    persistedState = await initializeSnapState(snap);
+  }
+
+  console.log(navigator);
+  console.log(persistedState);
+  console.debug('Request', request);
+
+  const snapLedgerKeyring = new SnapLedgerKeyring();
+  await snapLedgerKeyring.connect(snap);
   switch (request.method) {
     case 'hello':
       return snap.request({
@@ -35,7 +45,15 @@ export const onRpcRequest: OnRpcRequestHandler = async ({
           },
         ],
       });
-    //For Debug
+    case KeyringMethods.ListAccounts:
+      return await snapLedgerKeyring.listAccounts(persistedState, request);
+    // Only called once
+    case KeyringMethods.Setup:
+      if (persistedState.initialized) {
+        throw new Error('Ledger is already setup');
+      }
+      return snapLedgerKeyring.setup(snap, persistedState, request);
+    // For Debug
     case 'getState':
       return persistedState;
     default:
