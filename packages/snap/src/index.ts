@@ -31,6 +31,18 @@ export const onRpcRequest: OnRpcRequestHandler = async ({
 
   const snapLedgerKeyring = new SnapLedgerKeyring();
   await snapLedgerKeyring.connect(snap);
+  // Force Setup if state is not initialized
+  if (
+    !persistedState.initialized &&
+    request.method !== KeyringMethods.Setup &&
+    request.method !== KeyringMethods.ListAccounts &&
+    request.method !== 'getState'
+  ) {
+    throw new Error(
+      'Ledger Snap is not setup. Setup by calling `keyring_setup`',
+    );
+  }
+
   switch (request.method) {
     case 'hello':
       return snap.request({
