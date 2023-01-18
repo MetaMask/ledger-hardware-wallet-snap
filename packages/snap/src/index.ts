@@ -45,6 +45,16 @@ export const onRpcRequest: OnRpcRequestHandler = async ({
           },
         ],
       });
+    case KeyringMethods.GetAccounts:
+      return await snapLedgerKeyring.getAccounts(persistedState);
+    case KeyringMethods.AddAccount:
+      return await snapLedgerKeyring.addAccount(snap, persistedState, request);
+    case KeyringMethods.RemoveAccount:
+      return await snapLedgerKeyring.removeAccount(
+        snap,
+        persistedState,
+        request,
+      );
     case KeyringMethods.ListAccounts:
       return await snapLedgerKeyring.listAccounts(persistedState, request);
     // Only called once
