@@ -1,13 +1,13 @@
 {
   "version": "0.1.0",
-  "description": "An example Snap written in TypeScript.",
-  "proposedName": "TypeScript Example Snap",
+  "description": "Ledger Hardware Wallet Snap",
+  "proposedName": "Ledger Snap",
   "repository": {
     "type": "git",
     "url": "https://github.com/MetaMask/template-snap-monorepo.git"
   },
   "source": {
-    "shasum": "wuqy9x0+Td4dJnRvjhO3B+ITysFps3LBGplIRceOsSM=",
+    "shasum": "kERgDhdbb6c39Jl+gxvCiYrA5z3LR3nEN7TjGHqGDNU=",
     "location": {
       "npm": {
         "filePath": "dist/bundle.js",
@@ -18,9 +18,14 @@
     }
   },
   "initialPermissions": {
+    "snap_notify": {},
     "snap_confirm": {},
-    "endowment:webhid": {},
-    "snap_manageState": {}
+    "snap_manageState": {},
+    "endowment:rpc": {
+      "dapps": true,
+      "snaps": true
+    },
+    "endowment:webhid": {}
   },
   "manifestVersion": "0.1"
 }
