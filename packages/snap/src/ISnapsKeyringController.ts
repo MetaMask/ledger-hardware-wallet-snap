@@ -1,7 +1,7 @@
 import { SnapProvider } from '@metamask/snap-types';
 
 import { KeyringAccount, SnapKeyringState } from './types/SnapKeyringState';
-import { Signature } from './types/transactions';
+import { Signature, SignedPayload } from './types/transactions';
 
 export type ISnapsBaseKeyringController = {
   connect(snap: SnapProvider): Promise<void>;
@@ -9,41 +9,41 @@ export type ISnapsBaseKeyringController = {
     snap: SnapProvider,
     initialState: SnapKeyringState,
     request: unknown,
-  ): Promise<void>;
+  ): Promise<string>;
   getAccounts(persistedState: SnapKeyringState): Promise<KeyringAccount[]>;
   addAccount(
     snap: SnapProvider,
     persistedState: SnapKeyringState,
-    request: unknown,
+    request: { params: { accounts: KeyringAccount[] } },
   ): Promise<void>;
   removeAccount(
     snap: SnapProvider,
     persistedState: SnapKeyringState,
-    request: unknown,
+    request: { params: { address: string } },
   ): Promise<void>;
   listAccounts(
     persistedState: SnapKeyringState,
-    request: { page: number },
+    request: { params: { page: number } },
   ): Promise<KeyringAccount[]>;
   signMessage(
     snap: SnapProvider,
     persistedState: SnapKeyringState,
-    request: unknown,
-  ): Promise<Signature>;
+    request: { params: { message: any } },
+  ): Promise<SignedPayload>;
   signTransaction(
     snap: SnapProvider,
     persistedState: SnapKeyringState,
-    request: unknown,
-  ): Promise<Signature>;
+    request: { params: { data: any; rawHexTx: any } },
+  ): Promise<SignedPayload>;
   signEIP712Message(
     snap: SnapProvider,
     persistedState: SnapKeyringState,
-    request: unknown,
+    request: { params: { message: any } },
   ): Promise<Signature>;
   signEIP712TypedMessage(
     snap: SnapProvider,
     persistedState: SnapKeyringState,
-    request: unknown,
+    request: { params: { message: any } },
   ): Promise<Signature>;
 };
 
