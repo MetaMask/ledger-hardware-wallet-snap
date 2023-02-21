@@ -1,54 +1,44 @@
-import { OnRpcRequestHandler } from '@metamask/snap-types';
+/* eslint-disable no-case-declarations */
+import { OnRpcRequestHandler, SnapRpcHandler } from '@metamask/snap-types';
 
 import { SnapLedgerKeyring } from './ledger/SnapLedgerKeyring';
-import { KeyringMethods } from './types/methods.enum';
+import {
+  isUnrestrictedKeyringMethod,
+  KeyringMethods,
+} from './types/methods.enum';
 import { SnapKeyringState } from './types/SnapKeyringState';
 import { initializeSnapState } from './utils/initialize-state';
+import { updateKeyringState } from './utils/state';
 
-/**
- * Get a message from the origin. For demonstration purposes only.
- *
- * @param originString - The origin string.
- * @returns A message based on the origin.
- */
-export const getMessage = (originString: string): string =>
-  `Hello, ${originString}!`;
+declare let snap;
 
-/**
- * Handle incoming JSON-RPC requests, sent through `wallet_invokeSnap`.
- *
- * @param args - The request handler args as object.
- * @param args.origin - The origin of the request, e.g., the website that
- * invoked the snap.
- * @param args.request - A validated JSON-RPC request object.
- * @returns `null` if the request succeeded.
- * @throws If the request method is not valid for this snap.
- * @throws If the `snap_confirm` call failed.
- */
 export const onRpcRequest: OnRpcRequestHandler = async ({
   origin,
   request,
 }) => {
   let persistedState: SnapKeyringState = await snap.request({
     method: 'snap_manageState',
-    params: ['get'],
+    params: {
+      operation: 'get',
+    },
   });
 
   if (!persistedState) {
     persistedState = await initializeSnapState(snap);
   }
 
+  // eslint-disable-next-line no-restricted-globals
   console.log(navigator);
   console.log(persistedState);
   console.debug('Request', request);
 
   const snapLedgerKeyring = new SnapLedgerKeyring();
   await snapLedgerKeyring.connect(snap);
+
   // Force Setup if state is not initialized
   if (
     !persistedState.initialized &&
-    request.method !== KeyringMethods.Setup &&
-    request.method !== KeyringMethods.ListAccounts &&
+    !isUnrestrictedKeyringMethod(request.method) &&
     request.method !== 'getState'
   ) {
     throw new Error(
@@ -56,13 +46,15 @@ export const onRpcRequest: OnRpcRequestHandler = async ({
     );
   }
 
+  let confirmed: boolean;
+
   switch (request.method) {
     case 'hello':
       return snap.request({
         method: 'snap_confirm',
         params: [
           {
-            prompt: getMessage(origin),
+            prompt: origin,
             description:
               'This custom confirmation is just for display purposes.',
             textAreaContent:
@@ -70,6 +62,16 @@ export const onRpcRequest: OnRpcRequestHandler = async ({
           },
         ],
       });
+    case KeyringMethods.SetAccount:
+      const accountIndex = snapLedgerKeyring.setAccount(
+        persistedState,
+        request,
+      );
+      const updatedState: SnapKeyringState = {
+        ...persistedState,
+        currentAccount: accountIndex,
+      };
+      return await updateKeyringState(snap, updatedState);
     case KeyringMethods.GetAccounts:
       return await snapLedgerKeyring.getAccounts(persistedState);
     case KeyringMethods.AddAccount:
@@ -81,17 +83,73 @@ export const onRpcRequest: OnRpcRequestHandler = async ({
         request,
       );
     case KeyringMethods.SignEIP712Message:
+      confirmed = await snap.request({
+        method: 'snap_confirm',
+        params: [
+          {
+            prompt: `Please confirm signing of this message`,
+            textAreaContent: `${JSON.stringify(request.params)}`,
+          },
+        ],
+      });
+      if (!confirmed) {
+        throw new Error('User rejected transaction');
+      }
       throw new Error('TODO');
     case KeyringMethods.SignEIP712HashedMessage:
+      confirmed = await snap.request({
+        method: 'snap_confirm',
+        params: [
+          {
+            prompt: `Please confirm signing of this message`,
+            textAreaContent: `${JSON.stringify(request.params)}`,
+          },
+        ],
+      });
+      if (!confirmed) {
+        throw new Error('User rejected transaction');
+      }
       throw new Error('TODO');
     case KeyringMethods.SignMessage:
+      confirmed = await snap.request({
+        method: 'snap_confirm',
+        params: [
+          {
+            prompt: `Please confirm signing of this message`,
+            textAreaContent: `${JSON.stringify(request.params)}`,
+          },
+        ],
+      });
+      if (!confirmed) {
+        throw new Error('User rejected transaction');
+      }
       return await snapLedgerKeyring.signMessage(snap, persistedState, request);
     case KeyringMethods.SignTransaction:
+      confirmed = await snap.request({
+        method: 'snap_confirm',
+        params: [
+          {
+            prompt: `Please confirm signing of this message`,
+            textAreaContent: `${JSON.stringify(request.params)}`,
+          },
+        ],
+      });
+      if (!confirmed) {
+        throw new Error('User rejected transaction');
+      }
       return await snapLedgerKeyring.signTransaction(
         snap,
         persistedState,
         request,
       );
+    case KeyringMethods.ForgetDevice:
+      return await snap.request({
+        method: 'snap_manageState',
+        params: { operation: 'clear' },
+      });
+    case KeyringMethods.ResetState:
+      throw new Error('TODO');
+
     case KeyringMethods.ListAccounts:
       return await snapLedgerKeyring.listAccounts(persistedState, request);
     // Only called once
@@ -100,7 +158,6 @@ export const onRpcRequest: OnRpcRequestHandler = async ({
         throw new Error('Ledger is already setup');
       }
       return snapLedgerKeyring.setup(snap, persistedState, request);
-    // For Debug
     case 'getState':
       return persistedState;
     default:
