@@ -10,7 +10,7 @@
     "strict": true,
     "target": "ES2017",
     "strictPropertyInitialization": false,
-    "noEmit": false
+    "noEmit": true
   },
   "exclude": ["**/__snapshots__/**", "**/test/**", "**/*.test.ts"]
 }

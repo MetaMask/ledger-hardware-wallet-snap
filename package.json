@@ -55,6 +55,7 @@
     "webpack": "^5.72.1"
   },
   "dependencies": {
+    "@ethereumjs/tx": "^4.0.2",
     "@ledgerhq/hw-app-eth": "^6.30.3",
     "@ledgerhq/hw-transport-webhid": "^6.27.9",
     "@metamask/snaps-utils": "^0.27.1",
