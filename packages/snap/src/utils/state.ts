@@ -8,6 +8,10 @@ export const updateKeyringState = async (
 ): Promise<void> => {
   await snap.request({
     method: 'snap_manageState',
-    params: ['update', updatedState],
+    // TODO: figure out why state sometimes isn't serializable
+    params: {
+      operation: 'update',
+      newState: JSON.parse(JSON.stringify(updatedState)),
+    },
   });
 };

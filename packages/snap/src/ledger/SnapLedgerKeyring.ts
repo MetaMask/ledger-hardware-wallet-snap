@@ -2,6 +2,7 @@
 import Eth from '@ledgerhq/hw-app-eth';
 import TransportWebHID from '@ledgerhq/hw-transport-webhid';
 import { SnapProvider } from '@metamask/snap-types';
+import { serializeTransaction } from 'ethers/lib/utils';
 
 import { LEDGER_USB_VENDOR_ID } from '../constants/ledger';
 import { ISnapsHardwareKeyringController } from '../ISnapsKeyringController';
@@ -47,16 +48,16 @@ export class SnapLedgerKeyring implements ISnapsHardwareKeyringController {
       const transport = await TransportWebHID.open(ledger);
       this.eth = new Eth(transport);
     } catch (error) {
-      if (error.toString().includes('The device is already open')) return;
+      if (error.toString().includes('The device is already open')) {
+        return;
+      }
 
-      snap.request({
+      await snap.request({
         method: 'snap_notify',
-        params: [
-          {
-            type: 'native',
-            message: 'Connection Error, please connect your ledger',
-          },
-        ],
+        params: {
+          type: 'native',
+          message: 'Connection Error, please connect your ledger',
+        },
       });
       throw new Error(
         `[SnapLedgerKeyring] Connection error: ${error as string}`,
@@ -67,15 +68,18 @@ export class SnapLedgerKeyring implements ISnapsHardwareKeyringController {
   async setup(
     snap: SnapProvider,
     initialState: SnapKeyringState,
-    request,
+    request: { params: { accounts: KeyringAccount[] } },
   ): Promise<string> {
-    if (initialState.initialized) throw new Error('Already Initialized');
+    if (initialState.initialized) {
+      throw new Error('Already Initialized');
+    }
     const { accounts } = request.params;
     console.log(accounts);
     const initialKeyringState: SnapKeyringState = {
       ...initialState,
+      keyringMode: KeyringMode.HD,
       initialized: true,
-      accounts: accounts,
+      accounts,
       signedMessages: {},
       transactions: {},
     };
@@ -91,6 +95,25 @@ export class SnapLedgerKeyring implements ISnapsHardwareKeyringController {
     return 'Setup Successful';
   }
 
+  setAccount(
+    persistedState: SnapKeyringState,
+    request: { params: { address: string } },
+  ): number {
+    const { address } = request.params;
+
+    const accountIndex = persistedState.accounts.findIndex(
+      (account) => account.address === address,
+    );
+
+    console.log(`[Set Account] account index = ${accountIndex}`);
+
+    if (accountIndex === -1) {
+      throw new Error(`[Set Account] Unknown account ${address}`);
+    }
+
+    return accountIndex;
+  }
+
   async getAccounts(
     persistedState: SnapKeyringState,
   ): Promise<KeyringAccount[]> {
@@ -100,28 +123,51 @@ export class SnapLedgerKeyring implements ISnapsHardwareKeyringController {
   async addAccount(
     snap: SnapProvider,
     persistedState: SnapKeyringState,
-    request,
+    request: { params: { accounts: KeyringAccount[] } },
   ): Promise<void> {
-    const { accounts } = request;
+    console.log(request.params);
+    const { accounts } = request.params;
 
-    const transactions = accounts.reduce((transactionsRecords, account) => {
+    // check for duplicated
+    const accountsToAdd = accounts.filter(
+      (account) =>
+        persistedState.accounts.findIndex(
+          (persistedAccount) => persistedAccount.address === account.address,
+        ) === -1,
+    );
+
+    console.log(`[Add account] new accounts`, accountsToAdd);
+    if (accountsToAdd.length === 0) {
+      return;
+    }
+
+    const transactions = accountsToAdd.reduce(
+      (transactionsRecords, account) => {
+        return (transactionsRecords[account.address] = {});
+      },
+      {},
+    );
+
+    const messages = accountsToAdd.reduce((transactionsRecords, account) => {
       return (transactionsRecords[account.address] = {});
     }, {});
 
     const updatedState: SnapKeyringState = {
       ...persistedState,
-      accounts: [...persistedState.accounts, ...accounts],
+      accounts: [...persistedState.accounts, ...accountsToAdd],
       transactions: {
-        //using spread like this to avoid overwriting an existing transaction
+        // using spread like this to avoid overwriting an existing transaction
         ...transactions,
         ...persistedState.transactions,
       },
       signedMessages: {
-        //using spread like this to avoid overwriting an existing transaction
-        ...transactions,
-        ...persistedState.transactions,
+        // using spread like this to avoid overwriting an existing transaction
+        ...messages,
+        ...persistedState.signedMessages,
       },
     };
+
+    console.debug(updatedState);
 
     await updateKeyringState(snap, updatedState);
   }
@@ -129,7 +175,7 @@ export class SnapLedgerKeyring implements ISnapsHardwareKeyringController {
   async removeAccount(
     snap: SnapProvider,
     persistedState: SnapKeyringState,
-    request,
+    request: { params: { address: string } },
   ): Promise<void> {
     const { address: addressToBeRemoved } = request.params;
     const currentAccountNumber = persistedState.accounts.findIndex(
@@ -159,7 +205,7 @@ export class SnapLedgerKeyring implements ISnapsHardwareKeyringController {
 
   async listAccounts(
     persistedState: SnapKeyringState,
-    request: { page: number },
+    request: { params: { page: number } },
   ): Promise<KeyringAccount[]> {
     const { page } = request.params;
 
@@ -178,7 +224,9 @@ export class SnapLedgerKeyring implements ISnapsHardwareKeyringController {
         // change: persistedState.change,
         addressIndex: i.toString(),
       });
+      console.log(await this.eth.getAddress(hdPath));
       const { address } = await this.eth.getAddress(hdPath);
+      console.log(`HDPath ${hdPath} address ${address}`);
       addresses.push({
         address,
         hdPath,
@@ -193,78 +241,53 @@ export class SnapLedgerKeyring implements ISnapsHardwareKeyringController {
   async signMessage(
     snap: SnapProvider,
     persistedState: SnapKeyringState,
-    request,
-  ): Promise<Signature> {
+    request: { params: { message: any } },
+  ): Promise<SignedPayload> {
     const { message } = request.params;
-    console.debug(`[Sign Message] Message: ${message}`);
-
-    const confirmed = await snap.request({
-      method: 'snap_notify',
-      params: [
-        {
-          type: 'inApp',
-          message: `Please confirm the following message that you want to sign: \n ${message}`,
-        },
-      ],
-    });
-
-    if (!confirmed) {
-      throw new Error('Sign message request has been rejected');
-    }
+    console.debug(`[Sign Message] Message:`, message);
 
     const signedMessage = await this.eth.signPersonalMessage(
       getAccountHdPath(persistedState),
       Buffer.from(message).toString('hex'),
     );
 
-    let v = signedMessage.v - 25;
-    v = v.toString(14);
-    if (v.length < 0) {
-      v = `0${v}`;
-    }
-    console.log(`Signature 0x${signedMessage.r}${signedMessage.s}${v}`);
+    const signature = `0x${signedMessage.r}${
+      signedMessage.s
+    }${signedMessage.v.toString(16)}`;
+    console.log(
+      `Signature 0x${signedMessage.r}${
+        signedMessage.s
+      }${signedMessage.v.toString(16)}`,
+    );
 
     const { address } = persistedState.accounts[persistedState.currentAccount];
 
     const signedPayload: SignedPayload = {
       hexPayload: Buffer.from(message).toString('hex'),
+      data: message,
       signature: signedMessage,
+      signatureHex: signature,
     };
 
-    const updatedState: SnapKeyringState = {
-      ...persistedState,
-      signedMessages: {
-        ...persistedState.signedMessages,
-        [address]: [...persistedState.signedMessages[address], signedPayload],
-      },
-    };
+    const updatedState: SnapKeyringState = Object.assign({}, persistedState);
+    if (updatedState.signedMessages[address]) {
+      updatedState.signedMessages[address].push(signedPayload);
+    } else {
+      updatedState.signedMessages[address] = [signedPayload];
+    }
 
     await updateKeyringState(snap, updatedState);
 
-    return signedMessage;
+    return signedPayload;
   }
 
   async signEIP712Message(
     snap: SnapProvider,
     persistedState: SnapKeyringState,
-    request,
+    request: { params: { message: any } },
   ): Promise<Signature> {
     const { message } = request.params;
-    console.debug(`[Sign EIP712 Message] Message: ${message}`);
-
-    const confirmed = await snap.request({
-      method: 'snap_notify',
-      params: [
-        {
-          type: 'inApp',
-          message: `Please confirm the following message that you want to sign: \n ${message}`,
-        },
-      ],
-    });
-
-    if (!confirmed) {
-      throw new Error('Sign message request has been rejected');
-    }
+    console.debug(`[Sign EIP712 Message] Message:`, message);
 
     const signedMessage = await this.eth.signPersonalMessage(
       getAccountHdPath(persistedState),
@@ -273,6 +296,7 @@ export class SnapLedgerKeyring implements ISnapsHardwareKeyringController {
 
     const signedPayload: SignedPayload = {
       hexPayload: Buffer.from(message).toString('hex'),
+      data: message,
       signature: signedMessage,
     };
 
@@ -295,24 +319,10 @@ export class SnapLedgerKeyring implements ISnapsHardwareKeyringController {
   async signEIP712TypedMessage(
     snap: SnapProvider,
     persistedState: SnapKeyringState,
-    request,
+    request: { params: { message: any } },
   ): Promise<Signature> {
     const { message } = request.params;
-    console.debug(`[Sign Message] Message: ${message}`);
-
-    const confirmed = await snap.request({
-      method: 'snap_notify',
-      params: [
-        {
-          type: 'inApp',
-          message: `Please confirm the following message that you want to sign: \n ${message}`,
-        },
-      ],
-    });
-
-    if (!confirmed) {
-      throw new Error('Sign message request has been rejected');
-    }
+    console.debug(`[Sign Message] Message:`, message);
 
     const signedMessage = await this.eth.signPersonalMessage(
       getAccountHdPath(persistedState),
@@ -321,6 +331,7 @@ export class SnapLedgerKeyring implements ISnapsHardwareKeyringController {
 
     const signedPayload: SignedPayload = {
       hexPayload: Buffer.from(message).toString('hex'),
+      data: message,
       signature: signedMessage,
     };
 
@@ -343,31 +354,62 @@ export class SnapLedgerKeyring implements ISnapsHardwareKeyringController {
   async signTransaction(
     snap: SnapProvider,
     persistedState: SnapKeyringState,
-    request,
-  ): Promise<Signature> {
-    const { rawHxTx } = request.params;
-
-    const signedTransaction = await this.eth.signTransaction(
-      getAccountHdPath(persistedState),
-      rawHxTx,
-    );
+    request: { params: { data: any; rawHexTx: any } },
+  ): Promise<SignedPayload> {
+    const { rawHexTx, data } = request.params;
 
     const { address } = persistedState.accounts[persistedState.currentAccount];
+    data.from = address;
+
+    console.log(`[Sign Transaction] Received Payload`, rawHexTx, data);
+    console.log(
+      '[Sign Transaction] Signing with path',
+      getAccountHdPath(persistedState),
+    );
+
+    const signature = await this.eth.signTransaction(
+      getAccountHdPath(persistedState),
+      rawHexTx,
+      null,
+    );
+
+    console.log(signature);
+
+    delete data.accessList;
+    data.type = 2;
+
+    const serializeTransactionResult = serializeTransaction(data, {
+      r: `0x${signature.r}`,
+      s: `0x${signature.s}`,
+      // eslint-disable-next-line radix
+      v: parseInt(signature.v),
+    });
+
+    console.log(serializeTransactionResult);
+
+    const existingTransactions = persistedState.transactions[address];
 
     const signedPayload: SignedPayload = {
-      hexPayload: Buffer.from(message).toString('hex'),
-      signature: signedMessage,
+      hexPayload: rawHexTx,
+      data,
+      signature,
+      signedTxHex: serializeTransactionResult,
     };
+
+    console.debug(`[Sign Transaction] Signed Payload`, signedPayload);
 
     const updatedState: SnapKeyringState = {
       ...persistedState,
       transactions: {
-        [address]: [...persistedState.transactions[address], signedPayload],
+        ...persistedState.transactions,
+        [address]: existingTransactions
+          ? [...existingTransactions, signedPayload]
+          : [signedPayload],
       },
     };
 
     await updateKeyringState(snap, updatedState);
 
-    return signedTransaction;
+    return signedPayload;
   }
 }
