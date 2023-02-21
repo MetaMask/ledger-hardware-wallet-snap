@@ -1,10 +1,13 @@
-export interface Signature {
+export type Signature = {
   v: number | string;
   s: string;
   r: string;
-}
+};
 
-export interface SignedPayload {
+export type SignedPayload = {
   hexPayload: string;
+  data: Record<string, string>;
   signature: Signature;
-}
+  signedTxHex?: string;
+  signatureHex?: string;
+};

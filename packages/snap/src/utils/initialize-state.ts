@@ -1,10 +1,11 @@
 import { SnapProvider } from '@metamask/snap-types';
+
+import { updateKeyringState } from './state';
 import {
   KeyringAccountType,
   KeyringMode,
   SnapKeyringState,
 } from '../types/SnapKeyringState';
-import { updateKeyringState } from './state';
 
 export const initializeSnapState = async (
   snap: SnapProvider,

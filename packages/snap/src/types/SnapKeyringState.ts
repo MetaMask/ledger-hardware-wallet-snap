@@ -1,6 +1,6 @@
 import { SignedPayload } from './transactions';
 
-export interface SnapKeyringState {
+export type SnapKeyringState = {
   version: number;
   initialized: boolean;
   accounts: KeyringAccount[];
@@ -10,7 +10,7 @@ export interface SnapKeyringState {
   keyringAccountType: KeyringAccountType;
   signedMessages: Record<string, SignedPayload[]>;
   transactions: Record<string, SignedPayload[]>;
-}
+};
 
 export enum KeyringMode {
   HD = 'hd',
@@ -26,9 +26,9 @@ export enum KeyringAccountType {
   LedgerLegacy = 'account.ledger_legacy',
 }
 
-export interface KeyringAccount {
+export type KeyringAccount = {
   address: string;
   name: string;
   chainId: string;
   hdPath: string;
-}
+};
