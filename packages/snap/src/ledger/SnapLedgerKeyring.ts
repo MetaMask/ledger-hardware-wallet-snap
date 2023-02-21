@@ -2,7 +2,7 @@
 import Eth from '@ledgerhq/hw-app-eth';
 import TransportWebHID from '@ledgerhq/hw-transport-webhid';
 import { SnapProvider } from '@metamask/snap-types';
-import { serializeTransaction } from 'ethers/lib/utils';
+import { ethers } from 'ethers';
 
 import { LEDGER_USB_VENDOR_ID } from '../constants/ledger';
 import { ISnapsHardwareKeyringController } from '../ISnapsKeyringController';
@@ -378,7 +378,7 @@ export class SnapLedgerKeyring implements ISnapsHardwareKeyringController {
     delete data.accessList;
     data.type = 2;
 
-    const serializeTransactionResult = serializeTransaction(data, {
+    const serializeTransactionResult = ethers.utils.serializeTransaction(data, {
       r: `0x${signature.r}`,
       s: `0x${signature.s}`,
       // eslint-disable-next-line radix

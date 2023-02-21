@@ -1,5 +1,5 @@
 {
-  "name": "KeyManagement-LedgerSnap",
+  "name": "key-management-ledger-snap",
   "version": "0.1.0",
   "private": true,
   "description": "POC of Hardware wallet snap",
@@ -69,7 +69,7 @@
     "@ledgerhq/hw-app-eth": "^6.31.0",
     "@ledgerhq/hw-transport-webhid": "^6.27.11",
     "buffer": "^6.0.3",
-    "ethers": "^6.0.2"
+    "ethers": "^5.0.2"
   },
   "alias": {
     "@ledgerhq/devices": "@ledgerhq/devices/lib-es"
